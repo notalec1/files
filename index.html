@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Bulk Image Processor</title>
+    <!-- JSZip Library for zipping files -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
+
+    <style>
+        :root {
+            --primary: #2563eb;
+            --bg: #f8fafc;
+            --card: #ffffff;
+            --border: #e2e8f0;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg);
+            padding: 20px;
+            margin: 0;
+            color: #333;
+        }
+
+        .container {
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+
+        /* Controls Section */
+        .controls {
+            background: var(--card);
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+
+        .control-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        label {
+            font-size: 0.85rem;
+            font-weight: 600;
+            margin-bottom: 5px;
+            color: #64748b;
+        }
+
+        input[type="text"], input[type="number"], select {
+            padding: 8px;
+            border: 1px solid var(--border);
+            border-radius: 4px;
+            font-size: 1rem;
+        }
+
+        .upload-btn-wrapper {
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            margin-bottom: 20px;
+        }
+
+        .btn {
+            border: 2px solid gray;
+            color: gray;
+            background-color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+
+        .btn-primary {
+            background: var(--primary);
+            color: white;
+            border: none;
+            width: 100%;
+            padding: 12px;
+        }
+
+        .btn-upload {
+            background: white;
+            border: 2px dashed #cbd5e1;
+            color: #475569;
+            width: 100%;
+            text-align: center;
+            padding: 20px;
+        }
+
+        input[type=file] {
+            font-size: 100px;
+            position: absolute;
+            left: 0;
+            top: 0;
+            opacity: 0;
+            cursor: pointer;
+        }
+
+        /* Preview Grid */
+        .preview-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+            gap: 15px;
+        }
+
+        .image-card {
+            background: var(--card);
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .image-card img {
+            width: 100%;
+            height: 120px;
+            object-fit: cover;
+            border-radius: 4px;
+            margin-bottom: 8px;
+        }
+
+        .file-info {
+            font-size: 0.8rem;
+            text-align: center;
+            width: 100%;
+        }
+
+        .old-name { color: #94a3b8; text-decoration: line-through; font-size: 0.75rem;}
+        .new-name { color: var(--primary); font-weight: bold; word-break: break-all;}
+
+        #status {
+            margin-top: 10px;
+            font-weight: bold;
+            text-align: center;
+            color: var(--primary);
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>Batched Image Resizer & Renamer</h2>
+    
+    <div class="upload-btn-wrapper" style="width: 100%;">
+        <button class="btn btn-upload">Drag images here or Click to Upload</button>
+        <input type="file" id="fileInput" multiple accept="image/*" />
+    </div>
+
+    <div class="controls">
+        <div class="control-group">
+            <label>Filename Prefix</label>
+            <input type="text" id="namePrefix" placeholder="e.g. vacation-photo" value="image">
+        </div>
+        <div class="control-group">
+            <label>Start Numbering At</label>
+            <input type="number" id="startNumber" value="1">
+        </div>
+        <div class="control-group">
+            <label>Max Width (px)</label>
+            <input type="number" id="maxWidth" placeholder="Original">
+        </div>
+        <div class="control-group">
+            <label>Output Format</label>
+            <select id="format">
+                <option value="image/jpeg">JPG</option>
+                <option value="image/png">PNG</option>
+                <option value="image/webp" selected>WebP</option>
+            </select>
+        </div>
+        <div class="control-group">
+            <label>Quality (0.1 - 1.0)</label>
+            <input type="number" id="quality" value="0.9" step="0.1" max="1" min="0.1">
+        </div>
+    </div>
+
+    <button class="btn btn-primary" onclick="processImages()">Process & Download Zip</button>
+    <div id="status"></div>
+
+    <hr>
+    <h3>Preview</h3>
+    <div class="preview-grid" id="previewContainer"></div>
+</div>
+
+<script>
+    let uploadedFiles = [];
+    const fileInput = document.getElementById('fileInput');
+    const previewContainer = document.getElementById('previewContainer');
+    const namePrefixInput = document.getElementById('namePrefix');
+    const startNumberInput = document.getElementById('startNumber');
+    const formatSelect = document.getElementById('format');
+
+    // 1. Handle File Uploads
+    fileInput.addEventListener('change', function(e) {
+        uploadedFiles = Array.from(e.target.files);
+        updatePreview();
+    });
+
+    // 2. Update Previews dynamically when settings change
+    [namePrefixInput, startNumberInput, formatSelect].forEach(input => {
+        input.addEventListener('input', updatePreview);
+    });
+
+    function updatePreview() {
+        previewContainer.innerHTML = '';
+        const prefix = namePrefixInput.value || 'image';
+        let count = parseInt(startNumberInput.value) || 1;
+        
+        // Get extension from format
+        const formatMap = {
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/webp': '.webp'
+        };
+        const ext = formatMap[formatSelect.value];
+
+        uploadedFiles.forEach((file, index) => {
+            const newName = `${prefix}-${count}${ext}`;
+            
+            const card = document.createElement('div');
+            card.className = 'image-card';
+            
+            const img = document.createElement('img');
+            img.src = URL.createObjectURL(file);
+            
+            const info = document.createElement('div');
+            info.className = 'file-info';
+            info.innerHTML = `
+                <div class="old-name">${file.name}</div>
+                <div class="new-name">${newName}</div>
+            `;
+
+            card.appendChild(img);
+            card.appendChild(info);
+            previewContainer.appendChild(card);
+            
+            count++;
+        });
+    }
+
+    // 3. Process Images (Resize -> Convert -> Zip)
+    async function processImages() {
+        if (uploadedFiles.length === 0) {
+            alert("Please upload images first.");
+            return;
+        }
+
+        const statusDiv = document.getElementById('status');
+        statusDiv.innerText = "Processing... please wait.";
+
+        const zip = new JSZip();
+        const maxWidth = document.getElementById('maxWidth').value;
+        const format = document.getElementById('format').value;
+        const quality = parseFloat(document.getElementById('quality').value);
+        const prefix = namePrefixInput.value || 'image';
+        let count = parseInt(startNumberInput.value) || 1;
+        
+        const formatMap = {
+            'image/jpeg': '.jpg',
+            'image/png': '.png',
+            'image/webp': '.webp'
+        };
+        const ext = formatMap[format];
+
+        for (let i = 0; i < uploadedFiles.length; i++) {
+            const file = uploadedFiles[i];
+            
+            try {
+                const processedBlob = await resizeAndConvert(file, maxWidth, format, quality);
+                const filename = `${prefix}-${count}${ext}`;
+                zip.file(filename, processedBlob);
+                count++;
+            } catch (err) {
+                console.error("Error processing file:", file.name, err);
+            }
+        }
+
+        statusDiv.innerText = "Zipping files...";
+        
+        zip.generateAsync({type:"blob"})
+        .then(function(content) {
+            saveAs(content, "processed_images.zip");
+            statusDiv.innerText = "Done! Download started.";
+        });
+    }
+
+    function resizeAndConvert(file, maxWidth, format, quality) {
+        return new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.readAsDataURL(file);
+            reader.onload = (event) => {
+                const img = new Image();
+                img.src = event.target.result;
+                img.onload = () => {
+                    const canvas = document.createElement('canvas');
+                    let width = img.width;
+                    let height = img.height;
+
+                    // Resize logic
+                    if (maxWidth && width > maxWidth) {
+                        height = Math.round(height * (maxWidth / width));
+                        width = parseInt(maxWidth);
+                    }
+
+                    canvas.width = width;
+                    canvas.height = height;
+
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(img, 0, 0, width, height);
+
+                    canvas.toBlob((blob) => {
+                        resolve(blob);
+                    }, format, quality);
+                };
+                img.onerror = reject;
+            };
+            reader.onerror = reject;
+        });
+    }
+</script>
+
+</body>
+</html>
