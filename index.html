@@ -3,328 +3,654 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Bulk Image Processor</title>
-    <!-- JSZip Library for zipping files -->
+    <title>Ultimate Bulk Image Processor</title>
+    <!-- Essential Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
-
     <style>
         :root {
-            --primary: #2563eb;
-            --bg: #f8fafc;
-            --card: #ffffff;
-            --border: #e2e8f0;
+            --bg-body: #f0f2f5;
+            --bg-panel: #ffffff;
+            --text-main: #1f2937;
+            --primary: #3b82f6;
+            --accent: #8b5cf6;
+            --border: #e5e7eb;
+        }
+
+        [data-theme="dark"] {
+            --bg-body: #111827;
+            --bg-panel: #1f2937;
+            --text-main: #f3f4f6;
+            --primary: #60a5fa;
+            --border: #374151;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            background: var(--bg);
-            padding: 20px;
-            margin: 0;
-            color: #333;
+            font-family: -apple-system, system-ui, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background: var(--bg-body);
+            color: var(--text-main);
+            margin: 0; padding: 20px;
+            transition: 0.3s;
         }
 
-        .container {
-            max-width: 1000px;
-            margin: 0 auto;
-        }
-
-        /* Controls Section */
-        .controls {
-            background: var(--card);
-            padding: 20px;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
             margin-bottom: 20px;
+        }
+
+        .main-grid {
             display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            grid-template-columns: 350px 1fr;
+            gap: 20px;
+            height: calc(100vh - 100px);
+        }
+
+        /* Scrollable Sidebar */
+        .sidebar {
+            background: var(--bg-panel);
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1);
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            height: 100%;
+        }
+
+        /* Accordion Style Groups */
+        .group { margin-bottom: 20px; border-bottom: 1px solid var(--border); padding-bottom: 15px; }
+        .group-title { font-weight: 800; color: var(--primary); margin-bottom: 10px; text-transform: uppercase; font-size: 0.8rem; letter-spacing: 1px; }
+
+        .row { display: flex; gap: 10px; margin-bottom: 10px; align-items: center; }
+        .col { flex: 1; }
+
+        label { display: block; font-size: 0.8rem; font-weight: 600; margin-bottom: 4px; }
+        input, select {
+            width: 100%; padding: 8px; border-radius: 6px; border: 1px solid var(--border);
+            background: var(--bg-body); color: var(--text-main); box-sizing: border-box;
+        }
+        input[type="range"] { padding: 0; }
+
+        /* Main Content Area */
+        .content {
+            display: flex; flex-direction: column; gap: 20px; height: 100%;
+        }
+
+        .upload-zone {
+            border: 3px dashed var(--border);
+            border-radius: 12px;
+            padding: 30px;
+            text-align: center;
+            background: var(--bg-panel);
+            cursor: pointer;
+            transition: 0.2s;
+            flex-shrink: 0;
+        }
+        .upload-zone:hover { border-color: var(--primary); background: rgba(59,130,246,0.05); }
+
+        .preview-area {
+            flex-grow: 1;
+            background: var(--bg-panel);
+            border-radius: 12px;
+            padding: 20px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
             gap: 15px;
         }
 
-        .control-group {
-            display: flex;
-            flex-direction: column;
-        }
-
-        label {
-            font-size: 0.85rem;
-            font-weight: 600;
-            margin-bottom: 5px;
-            color: #64748b;
-        }
-
-        input[type="text"], input[type="number"], select {
-            padding: 8px;
+        .card {
+            background: var(--bg-body);
             border: 1px solid var(--border);
-            border-radius: 4px;
-            font-size: 1rem;
-        }
-
-        .upload-btn-wrapper {
-            position: relative;
+            border-radius: 8px;
             overflow: hidden;
-            display: inline-block;
-            margin-bottom: 20px;
+            position: relative;
+        }
+        
+        .card img { width: 100%; height: 120px; object-fit: cover; display: block; }
+        .card-info { padding: 8px; font-size: 0.7rem; text-align: center; word-break: break-all; }
+        .card-badge {
+            position: absolute; top: 5px; right: 5px;
+            background: rgba(0,0,0,0.7); color: white;
+            padding: 2px 6px; border-radius: 4px; font-size: 0.6rem;
         }
 
+        /* Buttons */
         .btn {
-            border: 2px solid gray;
-            color: gray;
-            background-color: white;
-            padding: 8px 20px;
-            border-radius: 8px;
-            font-size: 16px;
-            font-weight: bold;
-            cursor: pointer;
+            width: 100%; padding: 12px; border: none; border-radius: 8px;
+            font-weight: bold; cursor: pointer; transition: 0.2s;
         }
+        .btn-primary { background: var(--primary); color: white; font-size: 1.1rem; }
+        .btn-primary:hover { filter: brightness(1.1); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text-main); margin-top: 10px;}
 
-        .btn-primary {
-            background: var(--primary);
-            color: white;
-            border: none;
-            width: 100%;
-            padding: 12px;
+        /* Progress Modal */
+        #overlay {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0,0,0,0.8); z-index: 999; display: none;
+            justify-content: center; align-items: center; flex-direction: column; color: white;
         }
+        progress { width: 300px; height: 20px; margin-top: 15px; }
 
-        .btn-upload {
-            background: white;
-            border: 2px dashed #cbd5e1;
-            color: #475569;
-            width: 100%;
-            text-align: center;
-            padding: 20px;
-        }
-
-        input[type=file] {
-            font-size: 100px;
-            position: absolute;
-            left: 0;
-            top: 0;
-            opacity: 0;
-            cursor: pointer;
-        }
-
-        /* Preview Grid */
-        .preview-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
-            gap: 15px;
-        }
-
-        .image-card {
-            background: var(--card);
-            border: 1px solid var(--border);
-            border-radius: 8px;
-            padding: 10px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-        }
-
-        .image-card img {
-            width: 100%;
-            height: 120px;
-            object-fit: cover;
-            border-radius: 4px;
-            margin-bottom: 8px;
-        }
-
-        .file-info {
-            font-size: 0.8rem;
-            text-align: center;
-            width: 100%;
-        }
-
-        .old-name { color: #94a3b8; text-decoration: line-through; font-size: 0.75rem;}
-        .new-name { color: var(--primary); font-weight: bold; word-break: break-all;}
-
-        #status {
-            margin-top: 10px;
-            font-weight: bold;
-            text-align: center;
-            color: var(--primary);
+        @media (max-width: 800px) {
+            .main-grid { grid-template-columns: 1fr; height: auto; }
+            .sidebar { height: auto; margin-bottom: 20px;}
         }
     </style>
 </head>
-<body>
+<body data-theme="light">
 
-<div class="container">
-    <h2>Batched Image Resizer & Renamer</h2>
-    
-    <div class="upload-btn-wrapper" style="width: 100%;">
-        <button class="btn btn-upload">Drag images here or Click to Upload</button>
-        <input type="file" id="fileInput" multiple accept="image/*" />
+<div class="header">
+    <h2>⚡ Ultimate Image Tool</h2>
+    <button onclick="toggleTheme()" style="background:none; border:none; cursor:pointer; font-size:1.5rem;">🌗</button>
+</div>
+
+<div class="main-grid">
+    <!-- SIDEBAR CONTROLS -->
+    <div class="sidebar">
+        
+        <!-- 1. RESIZE & FORMAT -->
+        <div class="group">
+            <div class="group-title">📐 Dimensions & Format</div>
+            <div class="row">
+                <div class="col">
+                    <label>Width (px)</label>
+                    <input type="number" id="cfg_width" placeholder="Original">
+                </div>
+                <div class="col">
+                    <label>Height (px)</label>
+                    <input type="number" id="cfg_height" placeholder="Original">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label>Format</label>
+                    <select id="cfg_format">
+                        <option value="image/webp">WebP (Pro)</option>
+                        <option value="image/jpeg">JPG (Standard)</option>
+                        <option value="image/png">PNG (Lossless)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Quality (0-1)</label>
+                    <input type="number" id="cfg_quality" value="0.9" step="0.1" max="1">
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. TRANSFORMS -->
+        <div class="group">
+            <div class="group-title">🔄 Geometry</div>
+            <div class="row">
+                <div class="col">
+                    <label>Rotation</label>
+                    <select id="cfg_rotate">
+                        <option value="0">None</option>
+                        <option value="90">90° CW</option>
+                        <option value="180">180°</option>
+                        <option value="270">90° CCW</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <label>Flip</label>
+                    <select id="cfg_flip">
+                        <option value="none">None</option>
+                        <option value="h">Horizontal</option>
+                        <option value="v">Vertical</option>
+                    </select>
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label>Border Width</label>
+                    <input type="number" id="cfg_border_w" value="0">
+                </div>
+                <div class="col">
+                    <label>Border Color</label>
+                    <input type="color" id="cfg_border_c" value="#000000" style="height:35px">
+                </div>
+            </div>
+        </div>
+
+        <!-- 3. COLOR FILTERS -->
+        <div class="group">
+            <div class="group-title">🎨 Color Filters</div>
+            <label>Brightness (<span id="val_bright">100</span>%)</label>
+            <input type="range" id="cfg_bright" min="0" max="200" value="100">
+            
+            <label>Contrast (<span id="val_cont">100</span>%)</label>
+            <input type="range" id="cfg_contrast" min="0" max="200" value="100">
+            
+            <label>Saturation (<span id="val_sat">100</span>%)</label>
+            <input type="range" id="cfg_sat" min="0" max="200" value="100">
+            
+            <div class="row" style="margin-top:10px;">
+                <div class="col">
+                    <label>Grayscale</label>
+                    <input type="checkbox" id="cfg_gray"> 
+                </div>
+                <div class="col">
+                    <label>Invert</label>
+                    <input type="checkbox" id="cfg_invert">
+                </div>
+                <div class="col">
+                    <label>Sepia</label>
+                    <input type="checkbox" id="cfg_sepia">
+                </div>
+            </div>
+            <label>Blur (px)</label>
+            <input type="range" id="cfg_blur" min="0" max="20" value="0">
+        </div>
+
+        <!-- 4. WATERMARK -->
+        <div class="group">
+            <div class="group-title">© Watermark</div>
+            <input type="text" id="cfg_wm_text" placeholder="Watermark Text (Empty = None)">
+            <div class="row">
+                <div class="col"><input type="color" id="cfg_wm_color" value="#ffffff" style="height:35px"></div>
+                <div class="col"><input type="number" id="cfg_wm_alpha" value="0.7" step="0.1" max="1" placeholder="Opac"></div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <select id="cfg_wm_pos">
+                        <option value="br">Bottom Right</option>
+                        <option value="bl">Bottom Left</option>
+                        <option value="tr">Top Right</option>
+                        <option value="tl">Top Left</option>
+                        <option value="c">Center</option>
+                        <option value="tile">Tile (Repeat)</option>
+                    </select>
+                </div>
+                <div class="col">
+                    <input type="number" id="cfg_wm_size" value="30" placeholder="Size %">
+                </div>
+            </div>
+        </div>
+
+        <!-- 5. RENAMING -->
+        <div class="group">
+            <div class="group-title">🏷️ Renaming</div>
+            <div class="row">
+                <div class="col">
+                    <label>Prefix</label>
+                    <input type="text" id="cfg_prefix" value="img">
+                </div>
+                <div class="col">
+                    <label>Suffix</label>
+                    <input type="text" id="cfg_suffix" placeholder="_edit">
+                </div>
+            </div>
+            <div class="row">
+                <div class="col">
+                    <label>Start #</label>
+                    <input type="number" id="cfg_start" value="1">
+                </div>
+                <div class="col">
+                    <label>Padding</label>
+                    <select id="cfg_pad">
+                        <option value="0">1</option>
+                        <option value="2">01</option>
+                        <option value="3" selected>001</option>
+                        <option value="4">0001</option>
+                    </select>
+                </div>
+            </div>
+            <div style="margin-top:5px">
+                <input type="checkbox" id="cfg_keep_name"> <label style="display:inline">Keep Original Name</label>
+            </div>
+        </div>
+
+        <button class="btn btn-primary" onclick="startProcessing()">🚀 Process All</button>
+        <button class="btn btn-outline" onclick="resetSettings()">Reset Settings</button>
     </div>
 
-    <div class="controls">
-        <div class="control-group">
-            <label>Filename Prefix</label>
-            <input type="text" id="namePrefix" placeholder="e.g. vacation-photo" value="image">
+    <!-- MAIN CONTENT -->
+    <div class="content">
+        <div class="upload-zone" onclick="document.getElementById('fileInput').click()">
+            <h3 style="margin:0; color:var(--primary)">📂 Click or Drag Images Here</h3>
+            <p style="margin:5px 0 0 0; color:#888; font-size:0.9rem">Supports JPG, PNG, WEBP, GIF (static)</p>
+            <input type="file" id="fileInput" multiple accept="image/*" style="display:none">
         </div>
-        <div class="control-group">
-            <label>Start Numbering At</label>
-            <input type="number" id="startNumber" value="1">
-        </div>
-        <div class="control-group">
-            <label>Max Width (px)</label>
-            <input type="number" id="maxWidth" placeholder="Original">
-        </div>
-        <div class="control-group">
-            <label>Output Format</label>
-            <select id="format">
-                <option value="image/jpeg">JPG</option>
-                <option value="image/png">PNG</option>
-                <option value="image/webp" selected>WebP</option>
-            </select>
-        </div>
-        <div class="control-group">
-            <label>Quality (0.1 - 1.0)</label>
-            <input type="number" id="quality" value="0.9" step="0.1" max="1" min="0.1">
+
+        <div class="preview-area">
+            <h4 style="margin-top:0">Preview (<span id="count">0</span> files)</h4>
+            <div class="grid" id="grid"></div>
         </div>
     </div>
+</div>
 
-    <button class="btn btn-primary" onclick="processImages()">Process & Download Zip</button>
-    <div id="status"></div>
-
-    <hr>
-    <h3>Preview</h3>
-    <div class="preview-grid" id="previewContainer"></div>
+<!-- Progress Overlay -->
+<div id="overlay">
+    <h2>Processing Images...</h2>
+    <div id="status">Converting 1/10</div>
+    <progress id="pBar" value="0" max="100"></progress>
 </div>
 
 <script>
-    let uploadedFiles = [];
-    const fileInput = document.getElementById('fileInput');
-    const previewContainer = document.getElementById('previewContainer');
-    const namePrefixInput = document.getElementById('namePrefix');
-    const startNumberInput = document.getElementById('startNumber');
-    const formatSelect = document.getElementById('format');
-
-    // 1. Handle File Uploads
-    fileInput.addEventListener('change', function(e) {
-        uploadedFiles = Array.from(e.target.files);
-        updatePreview();
+    /* --- LOGIC & STATE --- */
+    let files = [];
+    const inputs = document.querySelectorAll('input, select');
+    
+    // Bind Events
+    document.getElementById('fileInput').addEventListener('change', handleUpload);
+    document.querySelector('.upload-zone').addEventListener('dragover', e => e.preventDefault());
+    document.querySelector('.upload-zone').addEventListener('drop', handleDrop);
+    
+    // Live Range Updates
+    ['bright', 'cont', 'sat'].forEach(k => {
+        document.getElementById(`cfg_${k}`).addEventListener('input', e => {
+            document.getElementById(`val_${k}`).innerText = e.target.value;
+            updateCSSPreview(); // Fast preview
+        });
     });
+    // Update preview on other changes
+    inputs.forEach(input => input.addEventListener('change', () => {
+        saveSettings();
+        updateCSSPreview();
+    }));
 
-    // 2. Update Previews dynamically when settings change
-    [namePrefixInput, startNumberInput, formatSelect].forEach(input => {
-        input.addEventListener('input', updatePreview);
-    });
+    // Load Settings on Start
+    loadSettings();
 
-    function updatePreview() {
-        previewContainer.innerHTML = '';
-        const prefix = namePrefixInput.value || 'image';
-        let count = parseInt(startNumberInput.value) || 1;
+    /* --- UPLOAD HANDLING --- */
+    function handleUpload(e) { addFiles(e.target.files); }
+    function handleDrop(e) {
+        e.preventDefault();
+        addFiles(e.dataTransfer.files);
+    }
+
+    function addFiles(fileList) {
+        files = [...files, ...Array.from(fileList)];
+        document.getElementById('count').innerText = files.length;
+        renderGrid();
+    }
+
+    function renderGrid() {
+        const grid = document.getElementById('grid');
+        grid.innerHTML = '';
         
-        // Get extension from format
-        const formatMap = {
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-            'image/webp': '.webp'
-        };
-        const ext = formatMap[formatSelect.value];
-
-        uploadedFiles.forEach((file, index) => {
-            const newName = `${prefix}-${count}${ext}`;
-            
-            const card = document.createElement('div');
-            card.className = 'image-card';
+        files.forEach((f, i) => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'card';
             
             const img = document.createElement('img');
-            img.src = URL.createObjectURL(file);
-            
-            const info = document.createElement('div');
-            info.className = 'file-info';
-            info.innerHTML = `
-                <div class="old-name">${file.name}</div>
-                <div class="new-name">${newName}</div>
-            `;
+            img.src = URL.createObjectURL(f);
+            img.className = 'preview-img';
+            img.dataset.idx = i;
 
-            card.appendChild(img);
-            card.appendChild(info);
-            previewContainer.appendChild(card);
-            
-            count++;
+            const info = document.createElement('div');
+            info.className = 'card-info';
+            info.innerText = f.name;
+
+            const badge = document.createElement('div');
+            badge.className = 'card-badge';
+            badge.innerText = (f.size / 1024).toFixed(0) + 'KB';
+
+            wrapper.append(img, badge, info);
+            grid.appendChild(wrapper);
+        });
+        updateCSSPreview();
+    }
+
+    // Fast CSS-based preview for filters (doesn't handle resize/watermark, just color)
+    function updateCSSPreview() {
+        const b = document.getElementById('cfg_bright').value;
+        const c = document.getElementById('cfg_contrast').value;
+        const s = document.getElementById('cfg_sat').value;
+        const g = document.getElementById('cfg_gray').checked ? 1 : 0;
+        const i = document.getElementById('cfg_invert').checked ? 1 : 0;
+        const se = document.getElementById('cfg_sepia').checked ? 1 : 0;
+        const bl = document.getElementById('cfg_blur').value;
+
+        const filterString = `brightness(${b}%) contrast(${c}%) saturate(${s}%) grayscale(${g}) invert(${i}) sepia(${se}) blur(${bl}px)`;
+        
+        document.querySelectorAll('.preview-img').forEach(img => {
+            img.style.filter = filterString;
         });
     }
 
-    // 3. Process Images (Resize -> Convert -> Zip)
-    async function processImages() {
-        if (uploadedFiles.length === 0) {
-            alert("Please upload images first.");
-            return;
-        }
-
-        const statusDiv = document.getElementById('status');
-        statusDiv.innerText = "Processing... please wait.";
-
-        const zip = new JSZip();
-        const maxWidth = document.getElementById('maxWidth').value;
-        const format = document.getElementById('format').value;
-        const quality = parseFloat(document.getElementById('quality').value);
-        const prefix = namePrefixInput.value || 'image';
-        let count = parseInt(startNumberInput.value) || 1;
+    /* --- PROCESSING ENGINE --- */
+    async function startProcessing() {
+        if(files.length === 0) return alert('No files uploaded!');
         
-        const formatMap = {
-            'image/jpeg': '.jpg',
-            'image/png': '.png',
-            'image/webp': '.webp'
-        };
-        const ext = formatMap[format];
+        const overlay = document.getElementById('overlay');
+        const pBar = document.getElementById('pBar');
+        const status = document.getElementById('status');
+        
+        overlay.style.display = 'flex';
+        const zip = new JSZip();
 
-        for (let i = 0; i < uploadedFiles.length; i++) {
-            const file = uploadedFiles[i];
-            
+        // Snapshot settings
+        const cfg = getSettings();
+        
+        // Extension Map
+        const extMap = { 'image/jpeg': '.jpg', 'image/png': '.png', 'image/webp': '.webp' };
+        const ext = extMap[cfg.format];
+
+        for(let i=0; i < files.length; i++) {
+            status.innerText = `Processing ${i+1}/${files.length}`;
+            pBar.value = i;
+            pBar.max = files.length;
+
             try {
-                const processedBlob = await resizeAndConvert(file, maxWidth, format, quality);
-                const filename = `${prefix}-${count}${ext}`;
-                zip.file(filename, processedBlob);
-                count++;
-            } catch (err) {
-                console.error("Error processing file:", file.name, err);
+                const blob = await processImage(files[i], cfg);
+                
+                // Naming Logic
+                let name;
+                if(cfg.keepName) {
+                    name = files[i].name.replace(/\.[^/.]+$/, "") + cfg.suffix + ext;
+                } else {
+                    const num = (parseInt(cfg.start) + i).toString().padStart(parseInt(cfg.pad), '0');
+                    name = `${cfg.prefix}${cfg.suffix}-${num}${ext}`;
+                }
+                
+                zip.file(name, blob);
+            } catch(e) {
+                console.error(e);
             }
         }
 
-        statusDiv.innerText = "Zipping files...";
+        status.innerText = "Zipping...";
+        const content = await zip.generateAsync({type:"blob"});
+        saveAs(content, "ultimate_batch.zip");
         
-        zip.generateAsync({type:"blob"})
-        .then(function(content) {
-            saveAs(content, "processed_images.zip");
-            statusDiv.innerText = "Done! Download started.";
-        });
+        overlay.style.display = 'none';
     }
 
-    function resizeAndConvert(file, maxWidth, format, quality) {
+    function processImage(file, cfg) {
         return new Promise((resolve, reject) => {
             const reader = new FileReader();
             reader.readAsDataURL(file);
-            reader.onload = (event) => {
+            reader.onload = (e) => {
                 const img = new Image();
-                img.src = event.target.result;
+                img.src = e.target.result;
                 img.onload = () => {
-                    const canvas = document.createElement('canvas');
-                    let width = img.width;
-                    let height = img.height;
+                    const cvs = document.createElement('canvas');
+                    const ctx = cvs.getContext('2d');
 
-                    // Resize logic
-                    if (maxWidth && width > maxWidth) {
-                        height = Math.round(height * (maxWidth / width));
-                        width = parseInt(maxWidth);
+                    // 1. Calculate Dimensions
+                    let w = img.width; 
+                    let h = img.height;
+
+                    if (cfg.width) {
+                        const scale = cfg.width / w;
+                        w = cfg.width;
+                        h = cfg.height ? cfg.height : h * scale; // Keep aspect if height missing
+                    } else if (cfg.height) {
+                        const scale = cfg.height / h;
+                        h = cfg.height;
+                        w = w * scale;
                     }
 
-                    canvas.width = width;
-                    canvas.height = height;
+                    // Handle Swap for Rotation (90/270)
+                    const isRotated = cfg.rotate == 90 || cfg.rotate == 270;
+                    cvs.width = isRotated ? h : w;
+                    cvs.height = isRotated ? w : h;
 
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(img, 0, 0, width, height);
+                    // Add Border Size
+                    const border = parseInt(cfg.borderW) || 0;
+                    cvs.width += border * 2;
+                    cvs.height += border * 2;
 
-                    canvas.toBlob((blob) => {
-                        resolve(blob);
-                    }, format, quality);
+                    // 2. Setup Context & Transforms
+                    // Fill background (for transparent images going to JPG)
+                    ctx.fillStyle = (cfg.format == 'image/jpeg') ? '#ffffff' : 'rgba(0,0,0,0)';
+                    ctx.fillRect(0, 0, cvs.width, cvs.height);
+
+                    // Border Drawing
+                    if(border > 0) {
+                        ctx.fillStyle = cfg.borderC;
+                        ctx.fillRect(0, 0, cvs.width, cvs.height);
+                    }
+
+                    ctx.save();
+                    
+                    // Move to center for rotation/flip
+                    ctx.translate(cvs.width/2, cvs.height/2);
+                    
+                    // Rotate
+                    ctx.rotate(cfg.rotate * Math.PI / 180);
+                    
+                    // Flip
+                    const scaleX = cfg.flip === 'h' ? -1 : 1;
+                    const scaleY = cfg.flip === 'v' ? -1 : 1;
+                    ctx.scale(scaleX, scaleY);
+
+                    // 3. Apply Filters
+                    const filters = [
+                        `brightness(${cfg.bright}%)`,
+                        `contrast(${cfg.contrast}%)`,
+                        `saturate(${cfg.sat}%)`,
+                        `blur(${cfg.blur}px)`
+                    ];
+                    if(cfg.gray) filters.push('grayscale(100%)');
+                    if(cfg.invert) filters.push('invert(100%)');
+                    if(cfg.sepia) filters.push('sepia(100%)');
+                    
+                    ctx.filter = filters.join(' ');
+
+                    // 4. Draw Image
+                    // Draw centered (subtract w/2, h/2)
+                    ctx.drawImage(img, -w/2, -h/2, w, h);
+                    
+                    ctx.restore(); // Remove filters/rotation for watermark text
+
+                    // 5. Watermark
+                    if (cfg.wmText) {
+                        const fontSize = (Math.max(cvs.width, cvs.height) * cfg.wmSize) / 1000;
+                        ctx.font = `bold ${Math.max(10, fontSize)}px Arial`;
+                        ctx.fillStyle = cfg.wmColor;
+                        ctx.globalAlpha = cfg.wmAlpha;
+                        ctx.textBaseline = 'middle';
+                        
+                        const text = cfg.wmText;
+                        const tm = ctx.measureText(text);
+                        const padding = 20;
+
+                        if (cfg.wmPos === 'tile') {
+                            // Tiling Logic
+                            ctx.rotate(-45 * Math.PI / 180);
+                            for (let x = -cvs.width; x < cvs.width * 2; x += tm.width + 50) {
+                                for (let y = -cvs.height; y < cvs.height * 2; y += 100) {
+                                    ctx.fillText(text, x, y);
+                                }
+                            }
+                        } else {
+                            let x, y;
+                            if (cfg.wmPos === 'c') { x = cvs.width/2 - tm.width/2; y = cvs.height/2; }
+                            if (cfg.wmPos === 'tl') { x = padding; y = padding + fontSize; }
+                            if (cfg.wmPos === 'tr') { x = cvs.width - tm.width - padding; y = padding + fontSize; }
+                            if (cfg.wmPos === 'bl') { x = padding; y = cvs.height - padding; }
+                            if (cfg.wmPos === 'br') { x = cvs.width - tm.width - padding; y = cvs.height - padding; }
+                            
+                            // Add slight shadow
+                            ctx.shadowColor="black"; ctx.shadowBlur=2;
+                            ctx.fillText(text, x, y);
+                        }
+                    }
+
+                    cvs.toBlob(resolve, cfg.format, parseFloat(cfg.quality));
                 };
                 img.onerror = reject;
             };
-            reader.onerror = reject;
         });
+    }
+
+    /* --- HELPERS --- */
+    function getSettings() {
+        return {
+            width: document.getElementById('cfg_width').value,
+            height: document.getElementById('cfg_height').value,
+            format: document.getElementById('cfg_format').value,
+            quality: document.getElementById('cfg_quality').value,
+            rotate: document.getElementById('cfg_rotate').value,
+            flip: document.getElementById('cfg_flip').value,
+            borderW: document.getElementById('cfg_border_w').value,
+            borderC: document.getElementById('cfg_border_c').value,
+            bright: document.getElementById('cfg_bright').value,
+            contrast: document.getElementById('cfg_contrast').value,
+            sat: document.getElementById('cfg_sat').value,
+            gray: document.getElementById('cfg_gray').checked,
+            invert: document.getElementById('cfg_invert').checked,
+            sepia: document.getElementById('cfg_sepia').checked,
+            blur: document.getElementById('cfg_blur').value,
+            wmText: document.getElementById('cfg_wm_text').value,
+            wmColor: document.getElementById('cfg_wm_color').value,
+            wmAlpha: document.getElementById('cfg_wm_alpha').value,
+            wmPos: document.getElementById('cfg_wm_pos').value,
+            wmSize: document.getElementById('cfg_wm_size').value,
+            prefix: document.getElementById('cfg_prefix').value,
+            suffix: document.getElementById('cfg_suffix').value,
+            start: document.getElementById('cfg_start').value,
+            pad: document.getElementById('cfg_pad').value,
+            keepName: document.getElementById('cfg_keep_name').checked
+        };
+    }
+
+    function saveSettings() {
+        const s = getSettings();
+        localStorage.setItem('ult_img_settings', JSON.stringify(s));
+    }
+
+    function loadSettings() {
+        const s = JSON.parse(localStorage.getItem('ult_img_settings'));
+        if(!s) return;
+        
+        // Helper to set values safely
+        const setVal = (id, val) => { const el = document.getElementById(id); if(el) el.value = val; };
+        const setCheck = (id, val) => { const el = document.getElementById(id); if(el) el.checked = val; };
+
+        setVal('cfg_width', s.width); setVal('cfg_height', s.height);
+        setVal('cfg_format', s.format); setVal('cfg_quality', s.quality);
+        setVal('cfg_rotate', s.rotate); setVal('cfg_flip', s.flip);
+        setVal('cfg_border_w', s.borderW); setVal('cfg_border_c', s.borderC);
+        setVal('cfg_bright', s.bright); setVal('cfg_contrast', s.contrast);
+        setVal('cfg_sat', s.sat); setVal('cfg_blur', s.blur);
+        setCheck('cfg_gray', s.gray); setCheck('cfg_invert', s.invert); setCheck('cfg_sepia', s.sepia);
+        setVal('cfg_wm_text', s.wmText); setVal('cfg_wm_color', s.wmColor);
+        setVal('cfg_wm_alpha', s.wmAlpha); setVal('cfg_wm_pos', s.wmPos); setVal('cfg_wm_size', s.wmSize);
+        setVal('cfg_prefix', s.prefix); setVal('cfg_suffix', s.suffix);
+        setVal('cfg_start', s.start); setVal('cfg_pad', s.pad);
+        setCheck('cfg_keep_name', s.keepName);
+
+        // Update Text Labels
+        document.getElementById('val_bright').innerText = s.bright;
+        document.getElementById('val_cont').innerText = s.contrast;
+        document.getElementById('val_sat').innerText = s.sat;
+    }
+
+    function resetSettings() {
+        localStorage.removeItem('ult_img_settings');
+        location.reload();
+    }
+
+    function toggleTheme() {
+        const body = document.body;
+        const current = body.getAttribute('data-theme');
+        body.setAttribute('data-theme', current === 'light' ? 'dark' : 'light');
     }
 </script>
 
